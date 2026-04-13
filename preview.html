@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VentSpace – Preview</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    body { background: #f5f0ff; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+
+    .phone {
+      width: 375px;
+      min-height: 812px;
+      background: #fff;
+      border-radius: 40px;
+      box-shadow: 0 30px 80px rgba(100,60,180,0.25);
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Screens ── */
+    .screen { display: none; flex-direction: column; flex: 1; }
+    .screen.active { display: flex; }
+
+    /* ── Home Screen ── */
+    #home { background: linear-gradient(160deg, #3b0764 0%, #6d28d9 60%, #a855f7 100%); justify-content: space-between; padding: 60px 32px 48px; }
+    .hero { align-items: center; display: flex; flex-direction: column; gap: 12px; }
+    .logo-emoji { font-size: 72px; }
+    .app-name { font-size: 38px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+    .tagline { font-size: 16px; color: rgba(255,255,255,0.75); text-align: center; line-height: 1.5; }
+    .home-btns { display: flex; flex-direction: column; gap: 14px; }
+    .btn-primary { background: #fff; color: #6d28d9; font-size: 17px; font-weight: 700; padding: 18px; border-radius: 16px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: transform .1s, opacity .1s; }
+    .btn-primary:active { transform: scale(0.97); opacity: .9; }
+    .btn-secondary { background: rgba(255,255,255,0.15); color: #fff; font-size: 17px; font-weight: 600; padding: 18px; border-radius: 16px; border: 2px solid rgba(255,255,255,0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .anon-note { color: rgba(255,255,255,0.5); font-size: 13px; text-align: center; }
+
+    /* ── Topic Screen ── */
+    #topics { background: #fafafa; }
+    .screen-header { padding: 52px 24px 16px; background: #fff; border-bottom: 1px solid #f0f0f0; }
+    .screen-title { font-size: 26px; font-weight: 800; color: #1a1a1a; }
+    .screen-sub { font-size: 14px; color: #888; margin-top: 4px; }
+    .topic-list { padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+    .topic-card { background: #fff; border-radius: 16px; padding: 20px; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); cursor: pointer; transition: transform .1s; border: 2px solid transparent; }
+    .topic-card:hover { transform: translateY(-2px); border-color: #e9d5ff; }
+    .topic-emoji { font-size: 32px; }
+    .topic-label { font-size: 17px; font-weight: 600; color: #1a1a1a; }
+    .topic-desc { font-size: 13px; color: #888; margin-top: 2px; }
+    .topic-arrow { margin-left: auto; color: #c084fc; font-size: 20px; }
+
+    /* ── Matching Screen ── */
+    #matching { background: #fff; align-items: center; justify-content: center; gap: 28px; padding: 40px 32px; }
+    .match-topic-badge { background: #f3e8ff; color: #7c3aed; font-size: 14px; font-weight: 600; padding: 8px 18px; border-radius: 20px; }
+    .pulse-ring { width: 140px; height: 140px; border-radius: 50%; background: #f3e8ff; display: flex; align-items: center; justify-content: center; animation: pulse 1.8s infinite; }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(139,92,246,0.4)} 50%{box-shadow:0 0 0 30px rgba(139,92,246,0)} }
+    .pulse-inner { width: 90px; height: 90px; background: #7c3aed; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 36px; }
+    .match-title { font-size: 22px; font-weight: 700; color: #1a1a1a; }
+    .match-sub { font-size: 14px; color: #888; text-align: center; }
+    .btn-cancel { border: 2px solid #e5e7eb; background: transparent; color: #6b7280; padding: 14px 40px; border-radius: 12px; font-size: 16px; cursor: pointer; }
+
+    /* ── Chat Screen ── */
+    #chat { background: #fff; }
+    .chat-header { background: #7c3aed; padding: 52px 16px 16px; display: flex; align-items: center; gap: 12px; }
+    .chat-back { background: rgba(255,255,255,0.2); border: none; color: #fff; width: 36px; height: 36px; border-radius: 18px; font-size: 18px; cursor: pointer; }
+    .chat-title { color: #fff; font-size: 16px; font-weight: 600; flex: 1; }
+    .chat-end { background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+    .messages { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+    .msg { max-width: 75%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4; }
+    .msg.sent { background: #7c3aed; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .msg.recv { background: #f3f4f6; color: #1a1a1a; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .chat-input { padding: 12px 16px; border-top: 1px solid #f0f0f0; display: flex; gap: 10px; }
+    .chat-input input { flex: 1; border: 2px solid #e9d5ff; border-radius: 24px; padding: 10px 16px; font-size: 15px; outline: none; }
+    .chat-send { background: #7c3aed; color: #fff; border: none; width: 44px; height: 44px; border-radius: 22px; font-size: 20px; cursor: pointer; }
+
+    /* ── Nav dots ── */
+    .nav { display: flex; justify-content: center; gap: 8px; padding: 12px; background: #fff; border-top: 1px solid #f0f0f0; }
+    .nav-dot { width: 8px; height: 8px; border-radius: 4px; background: #e9d5ff; cursor: pointer; transition: background .2s, width .2s; }
+    .nav-dot.active { background: #7c3aed; width: 24px; }
+  </style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- HOME -->
+  <div class="screen active" id="home">
+    <div class="hero">
+      <div class="logo-emoji">💜</div>
+      <div class="app-name">VentSpace</div>
+      <div class="tagline">A safe, anonymous space to be heard<br>and to listen.</div>
+    </div>
+    <div class="home-btns">
+      <button class="btn-primary" onclick="show('topics')">💬 &nbsp;Find Someone to Talk To</button>
+      <button class="btn-secondary" onclick="show('rooms')">🏠 &nbsp;Browse Public Rooms</button>
+      <div class="anon-note">No sign-up. 100% anonymous.</div>
+    </div>
+  </div>
+
+  <!-- TOPICS -->
+  <div class="screen" id="topics">
+    <div class="screen-header">
+      <div class="screen-title">What's on your mind?</div>
+      <div class="screen-sub">Choose a topic to match with someone</div>
+    </div>
+    <div class="topic-list">
+      <div class="topic-card" onclick="show('matching')">
+        <div class="topic-emoji">💔</div>
+        <div><div class="topic-label">Heartbreak & Relationships</div><div class="topic-desc">Going through a breakup or rough patch</div></div>
+        <div class="topic-arrow">›</div>
+      </div>
+      <div class="topic-card" onclick="show('matching')">
+        <div class="topic-emoji">😤</div>
+        <div><div class="topic-label">Work & Office Stress</div><div class="topic-desc">Deadlines, toxic workplaces, burnout</div></div>
+        <div class="topic-arrow">›</div>
+      </div>
+      <div class="topic-card" onclick="show('matching')">
+        <div class="topic-emoji">👨‍👩‍👧</div>
+        <div><div class="topic-label">Family Issues</div><div class="topic-desc">Complicated family dynamics</div></div>
+        <div class="topic-arrow">›</div>
+      </div>
+      <div class="topic-card" onclick="show('matching')">
+        <div class="topic-emoji">😰</div>
+        <div><div class="topic-label">Anxiety & Overthinking</div><div class="topic-desc">Racing thoughts, worry, stress</div></div>
+        <div class="topic-arrow">›</div>
+      </div>
+      <div class="topic-card" onclick="show('matching')">
+        <div class="topic-emoji">🗣</div>
+        <div><div class="topic-label">Just Venting</div><div class="topic-desc">No specific topic, just need to talk</div></div>
+        <div class="topic-arrow">›</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MATCHING -->
+  <div class="screen" id="matching">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:40px">
+      <div class="match-topic-badge">💔 Heartbreak &amp; Relationships</div>
+      <div class="pulse-ring"><div class="pulse-inner">💜</div></div>
+      <div class="match-title">Finding someone to listen...</div>
+      <div class="match-sub">Anonymous. No sign-up needed.<br>Usually takes under 30 seconds.</div>
+      <button class="btn-cancel" onclick="show('topics')">Cancel</button>
+    </div>
+    <script>setTimeout(()=>{ if(document.getElementById('matching').classList.contains('active')) show('chat'); }, 3000);</script>
+  </div>
+
+  <!-- CHAT -->
+  <div class="screen" id="chat">
+    <div class="chat-header">
+      <button class="chat-back" onclick="show('home')">←</button>
+      <div class="chat-title">💔 Heartbreak & Relationships</div>
+      <button class="chat-end">End</button>
+    </div>
+    <div class="messages" id="msgList">
+      <div class="msg recv">Hey, I'm here. What's going on? 👋</div>
+      <div class="msg sent">I just got dumped after 3 years. I don't even know what to do</div>
+      <div class="msg recv">That's really hard. 3 years is a long time. How are you feeling right now?</div>
+      <div class="msg sent">Empty honestly. Like I don't know who I am without them</div>
+      <div class="msg recv">That feeling makes complete sense. You built a life around someone and now it's just... gone. Give yourself permission to grieve that 💜</div>
+    </div>
+    <div class="chat-input">
+      <input type="text" placeholder="Type a message..." id="msgInput" onkeydown="if(event.key==='Enter')sendMsg()" />
+      <button class="chat-send" onclick="sendMsg()">↑</button>
+    </div>
+  </div>
+
+  <!-- ROOMS -->
+  <div class="screen" id="rooms">
+    <div class="screen-header">
+      <div class="screen-title">Public Rooms</div>
+      <div class="screen-sub">Join a room and connect with others</div>
+    </div>
+    <div class="topic-list">
+      <div class="topic-card" onclick="show('chat')"><div class="topic-emoji">💔</div><div><div class="topic-label">Heartbreak</div><div class="topic-desc">12 people online</div></div><div class="topic-arrow">›</div></div>
+      <div class="topic-card" onclick="show('chat')"><div class="topic-emoji">😤</div><div><div class="topic-label">Work Stress</div><div class="topic-desc">8 people online</div></div><div class="topic-arrow">›</div></div>
+      <div class="topic-card" onclick="show('chat')"><div class="topic-emoji">😰</div><div><div class="topic-label">Anxiety</div><div class="topic-desc">5 people online</div></div><div class="topic-arrow">›</div></div>
+      <div class="topic-card" onclick="show('chat')"><div class="topic-emoji">🗣</div><div><div class="topic-label">Just Venting</div><div class="topic-desc">19 people online</div></div><div class="topic-arrow">›</div></div>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <div class="nav-dot active" id="dot-home" onclick="show('home')"></div>
+    <div class="nav-dot" id="dot-topics" onclick="show('topics')"></div>
+    <div class="nav-dot" id="dot-matching" onclick="show('matching')"></div>
+    <div class="nav-dot" id="dot-chat" onclick="show('chat')"></div>
+    <div class="nav-dot" id="dot-rooms" onclick="show('rooms')"></div>
+  </div>
+</div>
+
+<script>
+  const screens = ['home','topics','matching','rooms','chat'];
+  function show(id) {
+    screens.forEach(s => {
+      document.getElementById(s).classList.remove('active');
+      const dot = document.getElementById('dot-'+s);
+      if(dot) dot.classList.remove('active');
+    });
+    document.getElementById(id).classList.add('active');
+    const dot = document.getElementById('dot-'+id);
+    if(dot) dot.classList.add('active');
+  }
+  function sendMsg() {
+    const input = document.getElementById('msgInput');
+    const text = input.value.trim();
+    if(!text) return;
+    const div = document.createElement('div');
+    div.className = 'msg sent';
+    div.textContent = text;
+    document.getElementById('msgList').appendChild(div);
+    input.value = '';
+    div.scrollIntoView({behavior:'smooth'});
+    setTimeout(() => {
+      const replies = ['I hear you 💜','That must be really tough','You\'re not alone in this','Take it one day at a time','How long has this been going on?'];
+      const r = document.createElement('div');
+      r.className = 'msg recv';
+      r.textContent = replies[Math.floor(Math.random()*replies.length)];
+      document.getElementById('msgList').appendChild(r);
+      r.scrollIntoView({behavior:'smooth'});
+    }, 1200);
+  }
+</script>
+</body>
+</html>
