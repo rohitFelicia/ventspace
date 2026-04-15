@@ -1,6 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -18,41 +17,84 @@ import { useChat } from '../hooks/useChat';
 import MessageBubble from '../components/MessageBubble';
 import EmojiPicker from '../components/EmojiPicker';
 import GifPicker from '../components/GifPicker';
+import BreathingOverlay from '../components/BreathingOverlay';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
+const STARTERS: Record<string, string[]> = {
+  Heartbreak: ["My heart is in pieces right now…", "I can't stop thinking about them", "I just need someone to listen"],
+  'Work Stress': ["I'm completely burnt out", "My workplace is so toxic", "I don't know how much longer I can keep this up"],
+  'Family Issues': ["Things at home are really hard right now", "I feel like no one understands me", "I just need to vent about my family"],
+  Anxiety: ["My mind won't quiet down", "I've been overthinking everything", "Even small things feel overwhelming lately"],
+  'Just Venting': ["I just need to get this out", "Something's been bothering me all day", "I don't even know where to start, but…"],
+};
+
+function getStarters(label: string): string[] {
+  return STARTERS[label] ?? ["What's on your mind?", "I'm here to listen", "Take your time, no rush"];
+}
+
 export default function ChatScreen({ navigation, route }: Props) {
   const { sessionId, topicLabel, topicColor } = route.params;
   const { user } = useUser();
-  const { messages, partnerLeft, sessionActive, sendMessage, sendGif, endSession } = useChat(
+  const { messages, partnerLeft, sessionActive, partnerTyping, sendMessage, sendGif, endSession, setTyping, addReaction, deleteSessionMessages } = useChat(
     sessionId,
     user?.uid,
   );
   const [inputText, setInputText] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [showGif, setShowGif] = useState(false);
+  const [showBreathing, setShowBreathing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const startTimeRef = useRef(Date.now());
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear typing status on unmount
+  useEffect(() => {
+    return () => {
+      setTyping(false);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When partner leaves, delete messages on this side too (last one cleans up)
+  useEffect(() => {
+    if (partnerLeft) {
+      deleteSessionMessages();
+    }
+  }, [partnerLeft]);
 
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text) return;
     setInputText('');
+    setTyping(false);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     await sendMessage(text);
   };
 
-  const handleEnd = () => {
-    Alert.alert('End Conversation', 'Are you sure you want to end this chat?', [
-      { text: 'Stay', style: 'cancel' },
-      {
-        text: 'End',
-        style: 'destructive',
-        onPress: async () => {
-          await endSession();
-          navigation.replace('Home');
-        },
-      },
-    ]);
+  const handleTyping = (text: string) => {
+    setInputText(text);
+    if (!chatEnded) {
+      setTyping(true);
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      typingTimerRef.current = setTimeout(() => setTyping(false), 2000);
+    }
+  };
+
+  const handleEnd = async () => {
+    if (!window.confirm('End this conversation?')) return;
+    const duration = Date.now() - startTimeRef.current;
+    const count = messages.length;
+    await endSession();
+    await deleteSessionMessages();
+    navigation.replace('VentSummary', {
+      topicLabel,
+      topicColor,
+      durationMs: duration,
+      messageCount: count,
+    });
   };
 
   const chatEnded = !sessionActive || partnerLeft;
@@ -64,11 +106,16 @@ export default function ChatScreen({ navigation, route }: Props) {
           <View style={[styles.activeDot, { backgroundColor: chatEnded ? COLORS.textMuted : topicColor }]} />
           <Text style={styles.headerTitle}>{topicLabel}</Text>
         </View>
-        {sessionActive && !partnerLeft && (
-          <TouchableOpacity style={styles.endButton} onPress={handleEnd}>
-            <Text style={styles.endButtonText}>End</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.breathBtn} onPress={() => setShowBreathing(true)}>
+            <Text style={styles.breathBtnText}>🌬️</Text>
           </TouchableOpacity>
-        )}
+          {sessionActive && !partnerLeft && (
+            <TouchableOpacity style={styles.endButton} onPress={handleEnd}>
+              <Text style={styles.endButtonText}>End</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {partnerLeft && (
@@ -92,16 +139,40 @@ export default function ChatScreen({ navigation, route }: Props) {
               isSent={item.senderId === user?.uid}
               type={item.type}
               gifUrl={item.gifUrl}
+              reactions={item.reactions}
+              onReact={(emoji) => addReaction(item.id, emoji)}
+              accentColor={topicColor}
             />
           )}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              You're connected! Say hi 👋{'\n'}This is a safe space — vent away.
-            </Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                You're connected! Say hi 👋{`\n`}This is a safe space — vent away.
+              </Text>
+              {!chatEnded && (
+                <View style={styles.starterChips}>
+                  {getStarters(topicLabel).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.starterChip, { borderColor: topicColor }]}
+                      onPress={() => setInputText(s)}
+                    >
+                      <Text style={[styles.starterChipText, { color: topicColor }]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
           }
         />
+
+        {partnerTyping && !chatEnded && (
+          <View style={styles.typingBar}>
+            <Text style={styles.typingText}>typing…</Text>
+          </View>
+        )}
 
         {!chatEnded ? (
           <View style={styles.inputArea}>
@@ -115,7 +186,7 @@ export default function ChatScreen({ navigation, route }: Props) {
               <TextInput
                 style={styles.input}
                 value={inputText}
-                onChangeText={setInputText}
+                onChangeText={handleTyping}
                 placeholder="Type something…"
                 placeholderTextColor={COLORS.textMuted}
                 multiline
@@ -151,6 +222,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         onClose={() => setShowGif(false)}
         onSelect={(gifUrl, title) => { sendGif(gifUrl, title); setShowGif(false); }}
       />
+      {showBreathing && <BreathingOverlay onClose={() => setShowBreathing(false)} />}
     </SafeAreaView>
   );
 }
@@ -171,6 +243,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  breathBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  breathBtnText: {
+    fontSize: 16,
   },
   activeDot: {
     width: 8,
@@ -208,12 +296,45 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.sm,
     flexGrow: 1,
   },
+  typingBar: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.card,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  typingText: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingTop: SPACING.xxl,
+    paddingHorizontal: SPACING.lg,
+  },
   emptyText: {
     color: COLORS.textMuted,
     textAlign: 'center',
     fontSize: 14,
     lineHeight: 22,
-    marginTop: SPACING.xxl,
+  },
+  starterChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+  },
+  starterChip: {
+    borderWidth: 1,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs + 2,
+  },
+  starterChipText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   inputArea: {
     backgroundColor: COLORS.card,

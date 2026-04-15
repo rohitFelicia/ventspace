@@ -11,6 +11,7 @@ import MatchingScreen from '../screens/MatchingScreen';
 import ChatScreen from '../screens/ChatScreen';
 import RoomsListScreen from '../screens/RoomsListScreen';
 import RoomChatScreen from '../screens/RoomChatScreen';
+import VentSummaryScreen from '../screens/VentSummaryScreen';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -18,6 +19,7 @@ export type RootStackParamList = {
   TopicSelect: undefined;
   Matching: { topicKey: string; topicLabel: string; topicColor: string };
   Chat: { sessionId: string; topicLabel: string; topicColor: string };
+  VentSummary: { topicLabel: string; topicColor: string; durationMs: number; messageCount: number };
   RoomsList: undefined;
   RoomChat: { topicKey: string; topicLabel: string; topicColor: string; roomId: string };
 };
@@ -46,6 +48,7 @@ export default function AppNavigator() {
             <Stack.Screen name="TopicSelect" component={TopicSelectScreen} />
             <Stack.Screen name="Matching" component={MatchingScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="VentSummary" component={VentSummaryScreen} />
             <Stack.Screen name="RoomsList" component={RoomsListScreen} />
             <Stack.Screen name="RoomChat" component={RoomChatScreen} />
           </>

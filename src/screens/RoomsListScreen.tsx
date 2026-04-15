@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -52,32 +52,36 @@ const PICK_EMOJIS = [
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RoomsList'>;
 
-function useTopicMemberCount(topicKey: string) {
-  const [count, setCount] = useState<number | null>(null);
+// Single listener for all member counts — avoids N parallel Firestore listeners
+function useAllMemberCounts(topicKeys: string[]) {
+  const [counts, setCounts] = useState<Record<string, number>>({});
   useEffect(() => {
-    const q = query(collection(db, 'rooms', topicKey, 'subrooms'));
-    const unsub = onSnapshot(q, (snap) => {
-      const total = snap.docs.reduce(
-        (sum, d) => sum + ((d.data().memberCount as number) ?? 0),
-        0,
-      );
-      setCount(total);
+    if (!topicKeys.length) return;
+    const unsubs = topicKeys.map((key) => {
+      const q = query(collection(db, 'rooms', key, 'subrooms'));
+      return onSnapshot(q, (snap) => {
+        const total = snap.docs.reduce(
+          (sum, d) => sum + ((d.data().memberCount as number) ?? 0), 0,
+        );
+        setCounts((prev) => ({ ...prev, [key]: total }));
+      });
     });
-    return unsub;
-  }, [topicKey]);
-  return count;
+    return () => unsubs.forEach((u) => u());
+  }, [topicKeys.join(',')]);
+  return counts;
 }
 
-function TopicCard({
+const TopicCard = memo(function TopicCard({
   item,
+  count,
   onPress,
   isJoining,
 }: {
   item: FirestoreTopic;
+  count: number | undefined;
   onPress: () => void;
   isJoining: boolean;
 }) {
-  const count = useTopicMemberCount(item.key);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} disabled={isJoining} activeOpacity={0.8}>
       <View style={[styles.iconWrap, { backgroundColor: item.color + '20' }]}>
@@ -87,7 +91,7 @@ function TopicCard({
         <Text style={styles.cardTitle}>{item.label}</Text>
         {!!item.description && <Text style={styles.cardDesc}>{item.description}</Text>}
         <Text style={[styles.onlineCount, { color: item.color }]}>
-          {count === null ? '…' : count === 0 ? 'Be the first to join' : `${count} ${count === 1 ? 'person' : 'people'} online`}
+          {count === undefined ? '…' : count === 0 ? 'Be the first to join' : `${count} ${count === 1 ? 'person' : 'people'} online`}
         </Text>
       </View>
       {isJoining ? (
@@ -97,7 +101,7 @@ function TopicCard({
       )}
     </TouchableOpacity>
   );
-}
+});
 
 function CreateRoomModal({
   visible,
@@ -209,6 +213,7 @@ export default function RoomsListScreen({ navigation }: Props) {
   const [loadingTopics, setLoadingTopics] = useState(true);
   const [joiningTopic, setJoiningTopic] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const memberCounts = useAllMemberCounts(topics.map((t) => t.key));
 
   // Seed hardcoded defaults into Firestore on first ever load
   const seedDefaultTopics = async (uid: string) => {
@@ -239,7 +244,7 @@ export default function RoomsListScreen({ navigation }: Props) {
     return unsub;
   }, [user?.uid]);
 
-  const handleJoin = async (item: FirestoreTopic) => {
+  const handleJoin = useCallback(async (item: FirestoreTopic) => {
     if (!user?.uid) return;
     setJoiningTopic(item.key);
     const result = await joinRoom(user.uid, item.key);
@@ -252,7 +257,7 @@ export default function RoomsListScreen({ navigation }: Props) {
         roomId: result.roomId,
       });
     }
-  };
+  }, [user?.uid, joinRoom, navigation]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -280,6 +285,7 @@ export default function RoomsListScreen({ navigation }: Props) {
           renderItem={({ item }) => (
             <TopicCard
               item={item}
+              count={memberCounts[item.key]}
               onPress={() => handleJoin(item)}
               isJoining={joiningTopic === item.key}
             />

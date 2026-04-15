@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "VentSpace",
+    "slug": "ventspace",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F0E6FF"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ventspace.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F0E6FF"
+      },
+      "package": "com.ventspace.app"
+    }
+  }
+}

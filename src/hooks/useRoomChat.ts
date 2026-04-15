@@ -2,11 +2,15 @@ import { useEffect, useState } from 'react';
 import {
   addDoc,
   collection,
+  doc,
+  increment,
   limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
@@ -18,6 +22,7 @@ export interface RoomMessage {
   senderId: string;
   senderAlias: string;
   timestamp: ReturnType<typeof serverTimestamp> | null;
+  reactions?: Record<string, number>;
 }
 
 export function useRoomChat(
@@ -27,6 +32,7 @@ export function useRoomChat(
   alias: string | null,
 ) {
   const [messages, setMessages] = useState<RoomMessage[]>([]);
+  const [typingAliases, setTypingAliases] = useState<string[]>([]);
 
   const senderAlias = alias ?? (uid ? `Anon#${uid.slice(-4).toUpperCase()}` : 'Anon');
 
@@ -43,7 +49,20 @@ export function useRoomChat(
       setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RoomMessage)));
     });
 
-    return unsubscribe;
+    const unsubTyping = onSnapshot(
+      collection(db, 'rooms', topicKey, 'subrooms', roomId, 'typing'),
+      (snap) => {
+        const names = snap.docs
+          .filter((d) => d.id !== uid && d.data().isTyping === true)
+          .map((d) => (d.data().alias as string) || 'Someone');
+        setTypingAliases(names);
+      },
+    );
+
+    return () => {
+      unsubscribe();
+      unsubTyping();
+    };
   }, [topicKey, roomId, uid]);
 
   const sendMessage = async (text: string) => {
@@ -69,5 +88,25 @@ export function useRoomChat(
     });
   };
 
-  return { messages, senderAlias, sendMessage, sendGif };
+  const setTyping = async (isTyping: boolean) => {
+    if (!uid || !roomId) return;
+    try {
+      await setDoc(
+        doc(db, 'rooms', topicKey, 'subrooms', roomId, 'typing', uid),
+        { isTyping, alias: senderAlias, ts: serverTimestamp() },
+      );
+    } catch { /* best-effort */ }
+  };
+
+  const addReaction = async (messageId: string, emoji: string) => {
+    if (!uid || !roomId) return;
+    try {
+      await updateDoc(
+        doc(db, 'rooms', topicKey, 'subrooms', roomId, 'messages', messageId),
+        { [`reactions.${emoji}`]: increment(1) },
+      );
+    } catch { /* best-effort */ }
+  };
+
+  return { messages, senderAlias, typingAliases, sendMessage, sendGif, setTyping, addReaction };
 }

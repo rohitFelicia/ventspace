@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,21 +8,57 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useUser } from '../context/UserContext';
+import { useStreak } from '../hooks/useStreak';
+import { useMoodBoard } from '../hooks/useMoodBoard';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export default function HomeScreen({ navigation }: Props) {
-  const { alias, logout } = useUser();
+  const { user, alias, logout } = useUser();
+  const streak = useStreak();
+  const moodBoard = useMoodBoard();
+
+  // Handle shared room deep links: ?room=<topicKey>&subroom=<roomId>
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const roomKey = params.get('room');
+      const subroomId = params.get('subroom');
+      if (!roomKey || !subroomId) return;
+      // Clear params so going back doesn't re-trigger
+      window.history.replaceState({}, '', window.location.pathname);
+      getDoc(doc(db, 'topics', roomKey)).then((snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        navigation.navigate('RoomChat', {
+          topicKey: roomKey,
+          topicLabel: data.label as string,
+          topicColor: data.color as string,
+          roomId: subroomId,
+        });
+      });
+    } catch { /* ignore */ }
+  }, [user]);
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       {/* Top bar with alias + logout */}
       <View style={styles.topBar}>
-        <Text style={styles.aliasText}>👤 {alias ?? 'Anonymous'}</Text>
+        <View style={styles.topBarLeft}>
+          <Text style={styles.aliasText}>👤 {alias ?? 'Anonymous'}</Text>
+          {streak.count > 0 && (
+            <View style={styles.streakBadge}>
+              <Text style={styles.streakText}>🔥 {streak.count}</Text>
+            </View>
+          )}
+        </View>
         <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
           <Text style={styles.logoutText}>Log out</Text>
         </TouchableOpacity>
@@ -35,6 +71,26 @@ export default function HomeScreen({ navigation }: Props) {
             A safe, anonymous space to be heard{'\n'}and to listen.
           </Text>
         </View>
+
+        {moodBoard.length > 0 && (
+          <View style={styles.moodBoard}>
+            <Text style={styles.moodBoardTitle}>Right now on VentSpace</Text>
+            <View style={styles.moodPills}>
+              {moodBoard.map((entry) => (
+                <TouchableOpacity
+                  key={entry.key}
+                  style={[styles.moodPill, { backgroundColor: entry.color + '20', borderColor: entry.color + '50' }]}
+                  onPress={() => navigation.navigate('RoomsList')}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.moodPillEmoji}>{entry.emoji}</Text>
+                  <Text style={[styles.moodPillLabel, { color: entry.color }]}>{entry.label}</Text>
+                  <Text style={styles.moodPillCount}>{entry.count}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={styles.buttons}>
           <TouchableOpacity
@@ -86,10 +142,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.sm,
   },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
   aliasText: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.primary,
+  },
+  streakBadge: {
+    backgroundColor: '#FF6B35' + '20',
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#FF6B35' + '40',
+  },
+  streakText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FF6B35',
   },
   logoutBtn: {
     paddingHorizontal: SPACING.md,
@@ -185,5 +259,41 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     lineHeight: 18,
+  },
+  moodBoard: {
+    gap: SPACING.sm,
+  },
+  moodBoardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  moodPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+  },
+  moodPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 5,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+  },
+  moodPillEmoji: {
+    fontSize: 14,
+  },
+  moodPillLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  moodPillCount: {
+    fontSize: 11,
+    color: COLORS.textMuted,
+    fontWeight: '500',
   },
 });
