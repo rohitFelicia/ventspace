@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { showNotification } from './useNotifications';
 import {
   addDoc,
   collection,
@@ -37,8 +38,28 @@ export function useChat(sessionId: string | null, uid: string | undefined) {
     const messagesRef = collection(db, 'sessions', sessionId, 'messages');
     const q = query(messagesRef, orderBy('timestamp', 'asc'));
 
+    const loadedRef = { current: false };
+    const prevCountRef = { current: 0 };
+
     const unsubMessages = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Message)));
+      const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Message));
+      setMessages(msgs);
+
+      if (!loadedRef.current) {
+        loadedRef.current = true;
+        prevCountRef.current = msgs.length;
+        return;
+      }
+      if (msgs.length > prevCountRef.current) {
+        const newest = msgs[msgs.length - 1];
+        if (newest && newest.senderId !== uid) {
+          showNotification(
+            'New message on VentSpace 💜',
+            newest.type === 'gif' ? 'Sent a GIF 🖼️' : newest.text.slice(0, 80),
+          );
+        }
+      }
+      prevCountRef.current = msgs.length;
     });
 
     const unsubSession = onSnapshot(doc(db, 'sessions', sessionId), (snap) => {

@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
+import { requestNotificationPermission } from '../hooks/useNotifications';
 
 interface UserContextType {
   user: User | null;
@@ -54,6 +55,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
+        requestNotificationPermission();
         // If we already have a cached alias, show the app immediately
         // then refresh from Firestore in the background
         const cached = getCachedAlias();

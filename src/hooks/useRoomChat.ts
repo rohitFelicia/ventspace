@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { showNotification } from './useNotifications';
 import {
   addDoc,
   collection,
@@ -45,8 +46,28 @@ export function useRoomChat(
       limit(100),
     );
 
+    const loadedRef = { current: false };
+    const prevCountRef = { current: 0 };
+
     const unsubscribe = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() } as RoomMessage)));
+      const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RoomMessage));
+      setMessages(msgs);
+
+      if (!loadedRef.current) {
+        loadedRef.current = true;
+        prevCountRef.current = msgs.length;
+        return;
+      }
+      if (msgs.length > prevCountRef.current) {
+        const newest = msgs[msgs.length - 1];
+        if (newest && newest.senderId !== uid) {
+          showNotification(
+            `${newest.senderAlias} in ${topicKey} Room 💬`,
+            newest.type === 'gif' ? 'Sent a GIF 🖼️' : newest.text.slice(0, 80),
+          );
+        }
+      }
+      prevCountRef.current = msgs.length;
     });
 
     const unsubTyping = onSnapshot(
