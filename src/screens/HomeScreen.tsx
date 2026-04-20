@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { useUser } from '../context/UserContext';
 import { useStreak } from '../hooks/useStreak';
 import { useMoodBoard } from '../hooks/useMoodBoard';
+import { requestNotificationPermission } from '../hooks/useNotifications';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -22,6 +23,18 @@ export default function HomeScreen({ navigation }: Props) {
   const { user, alias, logout } = useUser();
   const streak = useStreak();
   const moodBoard = useMoodBoard();
+
+  // Track notification permission so we can show the opt-in banner
+  const [notifStatus, setNotifStatus] = useState<string>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
+  );
+
+  const handleEnableNotifications = () => {
+    if (typeof Notification === 'undefined') return;
+    Notification.requestPermission().then((result) => {
+      setNotifStatus(result);
+    }).catch(() => {});
+  };
 
   // Handle shared room deep links: ?room=<topicKey>&subroom=<roomId>
   useEffect(() => {
@@ -125,6 +138,17 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.disclaimer}>
           All conversations are anonymous · Be kind · You are not alone 💙
         </Text>
+
+        {notifStatus === 'default' && (
+          <TouchableOpacity style={styles.notifBanner} onPress={handleEnableNotifications} activeOpacity={0.8}>
+            <Text style={styles.notifBannerIcon}>🔔</Text>
+            <View style={styles.notifBannerText}>
+              <Text style={styles.notifBannerTitle}>Enable notifications</Text>
+              <Text style={styles.notifBannerSub}>Get notified when someone messages you</Text>
+            </View>
+            <Text style={styles.notifBannerArrow}>›</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -295,5 +319,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
     fontWeight: '500',
+  },
+  notifBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.primary + '12',
+    borderWidth: 1,
+    borderColor: COLORS.primary + '35',
+    borderRadius: RADIUS.lg,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+  notifBannerIcon: {
+    fontSize: 22,
+  },
+  notifBannerText: {
+    flex: 1,
+  },
+  notifBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  notifBannerSub: {
+    fontSize: 11,
+    color: COLORS.textSecondary,
+    marginTop: 1,
+  },
+  notifBannerArrow: {
+    fontSize: 20,
+    color: COLORS.primary,
+    fontWeight: '300',
   },
 });

@@ -17,9 +17,9 @@ export function showNotification(title: string, body: string): void {
   try {
     new Notification(title, {
       body,
-      icon: '/icon.png',
-      badge: '/icon.png',
-      tag: 'ventspace-message', // collapses rapid messages into one notification
+      // Unique tag per message so notifications don't silently collapse
+      tag: `vs-${Date.now()}`,
+      silent: false,
     });
   } catch {
     // Ignore — some browsers block Notification outside a SW context
