@@ -17,7 +17,7 @@ import { db } from '../firebase/config';
 
 export interface RoomMessage {
   id: string;
-  type: 'text' | 'gif';
+  type: 'text' | 'gif' | 'system';
   text: string;
   gifUrl?: string;
   senderId: string;

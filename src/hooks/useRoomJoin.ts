@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import {
+  addDoc,
   collection,
   doc,
   getDocs,
@@ -34,6 +35,7 @@ export function useRoomJoin() {
   const joinRoom = async (
     uid: string,
     topicKey: string,
+    alias?: string,
   ): Promise<{ roomId: string } | null> => {
     setJoining(true);
     setError(null);
@@ -81,6 +83,19 @@ export function useRoomJoin() {
         });
       }
 
+      // Write system join message
+      try {
+        await addDoc(
+          collection(db, 'rooms', topicKey, 'subrooms', targetRoomId, 'messages'),
+          {
+            type: 'system',
+            text: `${alias ?? 'Someone'} joined the chat`,
+            senderId: 'system',
+            timestamp: serverTimestamp(),
+          },
+        );
+      } catch { /* non-blocking */ }
+
       return { roomId: targetRoomId };
     } catch (err: any) {
       console.error('Room join error:', err);
@@ -91,8 +106,20 @@ export function useRoomJoin() {
     }
   };
 
-  const leaveRoom = async (uid: string, topicKey: string, roomId: string) => {
+  const leaveRoom = async (uid: string, topicKey: string, roomId: string, alias?: string) => {
     try {
+      // Write system leave message first (before decrement)
+      try {
+        await addDoc(
+          collection(db, 'rooms', topicKey, 'subrooms', roomId, 'messages'),
+          {
+            type: 'system',
+            text: `${alias ?? 'Someone'} left the chat`,
+            senderId: 'system',
+            timestamp: serverTimestamp(),
+          },
+        );
+      } catch { /* non-blocking */ }
       const roomRef = doc(db, 'rooms', topicKey, 'subrooms', roomId);
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(roomRef);

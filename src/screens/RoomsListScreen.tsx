@@ -207,7 +207,7 @@ function CreateRoomModal({
 }
 
 export default function RoomsListScreen({ navigation }: Props) {
-  const { user } = useUser();
+  const { user, alias } = useUser();
   const { joinRoom } = useRoomJoin();
   const [topics, setTopics] = useState<FirestoreTopic[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(true);
@@ -247,7 +247,7 @@ export default function RoomsListScreen({ navigation }: Props) {
   const handleJoin = useCallback(async (item: FirestoreTopic) => {
     if (!user?.uid) return;
     setJoiningTopic(item.key);
-    const result = await joinRoom(user.uid, item.key);
+    const result = await joinRoom(user.uid, item.key, alias ?? undefined);
     setJoiningTopic(null);
     if (result) {
       navigation.navigate('RoomChat', {
@@ -257,7 +257,7 @@ export default function RoomsListScreen({ navigation }: Props) {
         roomId: result.roomId,
       });
     }
-  }, [user?.uid, joinRoom, navigation]);
+  }, [user?.uid, alias, joinRoom, navigation]);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -50,17 +50,17 @@ export default function RoomChatScreen({ navigation, route }: Props) {
   // Leave the subroom when navigating away OR closing the browser tab
   useEffect(() => {
     const handleUnload = () => {
-      if (user?.uid) leaveRoom(user.uid, topicKey, roomId);
+      if (user?.uid) leaveRoom(user.uid, topicKey, roomId, senderAlias);
     };
     window.addEventListener('beforeunload', handleUnload);
     const handleVisibility = () => {
       if (document.visibilityState === 'hidden' && user?.uid) {
-        leaveRoom(user.uid, topicKey, roomId);
+        leaveRoom(user.uid, topicKey, roomId, senderAlias);
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => {
-      if (user?.uid) leaveRoom(user.uid, topicKey, roomId);
+      if (user?.uid) leaveRoom(user.uid, topicKey, roomId, senderAlias);
       setTyping(false);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       window.removeEventListener('beforeunload', handleUnload);
@@ -182,6 +182,14 @@ export default function RoomChatScreen({ navigation, route }: Props) {
           }
           renderItem={({ item }) => {
             const isSent = item.senderId === user?.uid;
+            // System messages (join/leave) render as a centered pill
+            if (item.type === 'system') {
+              return (
+                <View style={styles.systemMsgRow}>
+                  <Text style={styles.systemMsgText}>{item.text}</Text>
+                </View>
+              );
+            }
             return (
               <View style={[styles.msgRow, isSent ? styles.msgRowSent : styles.msgRowReceived]}>
                 {!isSent && (
@@ -326,6 +334,21 @@ const styles = StyleSheet.create({
   vibeOptionText: { fontSize: 14 },
   shareBtn: { padding: 4 },
   shareBtnText: { fontSize: 18 },
+  systemMsgRow: {
+    alignItems: 'center',
+    marginVertical: 6,
+  },
+  systemMsgText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    backgroundColor: COLORS.card,
+    borderRadius: RADIUS.full,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    overflow: 'hidden',
+  },
   typingBar: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs,
