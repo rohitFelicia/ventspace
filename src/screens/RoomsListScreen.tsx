@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,6 +15,8 @@ import {
   addDoc,
   collection,
   doc,
+  getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -214,6 +216,8 @@ export default function RoomsListScreen({ navigation }: Props) {
   const [joiningTopic, setJoiningTopic] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const memberCounts = useAllMemberCounts(topics.map((t) => t.key));
+  // Pre-fetched roomIds keyed by topicKey — populated as topics load so tap = instant navigate
+  const roomIdCache = useRef<Record<string, string>>({});
 
   // Seed hardcoded defaults into Firestore on first ever load
   const seedDefaultTopics = async (uid: string) => {
@@ -238,18 +242,40 @@ export default function RoomsListScreen({ navigation }: Props) {
         await seedDefaultTopics(user.uid);
         return;
       }
-      setTopics(snap.docs.map((d) => ({ key: d.id, ...d.data() } as FirestoreTopic)));
+      const newTopics = snap.docs.map((d) => ({ key: d.id, ...d.data() } as FirestoreTopic));
+      setTopics(newTopics);
       setLoadingTopics(false);
+      // Pre-fetch the first subroom for each topic so taps are instant
+      newTopics.forEach(({ key: topicKey }) => {
+        if (roomIdCache.current[topicKey]) return; // already cached
+        getDocs(query(collection(db, 'rooms', topicKey, 'subrooms'), limit(1)))
+          .then((s) => { if (!s.empty) roomIdCache.current[topicKey] = s.docs[0].id; })
+          .catch(() => {});
+      });
     });
     return unsub;
   }, [user?.uid]);
 
   const handleJoin = useCallback(async (item: FirestoreTopic) => {
     if (!user?.uid) return;
+    const cachedRoomId = roomIdCache.current[item.key];
+    if (cachedRoomId) {
+      // Instant navigate — fire join writes in background
+      joinRoom(user.uid, item.key, alias ?? undefined).catch(() => {});
+      navigation.navigate('RoomChat', {
+        topicKey: item.key,
+        topicLabel: item.label,
+        topicColor: item.color,
+        roomId: cachedRoomId,
+      });
+      return;
+    }
+    // Cache miss (first ever join for this topic) — wait for getDocs inside joinRoom
     setJoiningTopic(item.key);
     const result = await joinRoom(user.uid, item.key, alias ?? undefined);
     setJoiningTopic(null);
     if (result) {
+      roomIdCache.current[item.key] = result.roomId;
       navigation.navigate('RoomChat', {
         topicKey: item.key,
         topicLabel: item.label,

@@ -5,21 +5,32 @@
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
-    "ios": "expo start --ios"
+    "ios": "expo start --ios",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:group": "playwright test tests/group-room.spec.ts --headed",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~3.2.3",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
+    "cacache": "^20.0.4",
     "expo": "~51.0.0",
     "expo-status-bar": "~1.12.1",
     "firebase": "^10.12.0",
+    "metro": "^0.84.3",
     "react": "18.2.0",
+    "react-dom": "^18.2.0",
     "react-native": "0.74.1",
     "react-native-safe-area-context": "4.10.1",
-    "react-native-screens": "3.31.1"
+    "react-native-screens": "3.31.1",
+    "react-native-web": "^0.19.13",
+    "tr46": "^6.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@playwright/test": "^1.59.1",
     "@types/react": "~18.2.45",
     "typescript": "^5.3.0"
   }
