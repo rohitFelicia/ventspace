@@ -70,9 +70,12 @@ export function useRoomJoin() {
         : runTransaction(db, async (tx) => {
             const roomSnap = await tx.get(targetRef);
             if (!roomSnap.exists()) throw new Error('Room disappeared');
-            const current = (roomSnap.data().memberCount as number) ?? 0;
+            const data = roomSnap.data();
+            const members = (data.members as Record<string, boolean>) ?? {};
+            const alreadyMember = members[uid] === true;
+            const current = (data.memberCount as number) ?? 0;
             tx.update(targetRef, {
-              memberCount: current + 1,
+              memberCount: alreadyMember ? current : current + 1,
               [`members.${uid}`]: true,
             });
           });
@@ -119,9 +122,12 @@ export function useRoomJoin() {
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(roomRef);
         if (!snap.exists()) return;
-        const current = snap.data().memberCount as number;
+        const data = snap.data();
+        const members = (data.members as Record<string, boolean>) ?? {};
+        const wasMember = members[uid] === true;
+        const current = (data.memberCount as number) ?? 0;
         tx.update(roomRef, {
-          memberCount: Math.max(0, current - 1),
+          memberCount: wasMember ? Math.max(0, current - 1) : current,
           [`members.${uid}`]: false,
         });
       });

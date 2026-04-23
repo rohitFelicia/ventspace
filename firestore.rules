@@ -103,6 +103,8 @@ service cloud.firestore {
         && request.resource.data.text.size() <= 500;
       // Allow updating messages for emoji reactions
       allow update: if request.auth != null;
+      // Allow authenticated users to delete (used for room cleanup)
+      allow delete: if request.auth != null;
     }
 
     match /rooms/{topicKey}/subrooms/{roomId}/typing/{typingUserId} {
