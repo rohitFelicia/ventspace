@@ -18,5 +18,28 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      // iPhone 14 Pro viewport (393x852) emulated in Chromium
+      name: 'iPhone',
+      use: {
+        ...devices['iPhone 14 Pro'],
+        browserName: 'chromium',
+        defaultBrowserType: 'chromium',
+      },
+    },
+    {
+      // Pixel 7 viewport (412x915) — native Chromium
+      name: 'Pixel',
+      use: { ...devices['Pixel 7'] },
+    },
+    {
+      // iPad Pro 11 viewport (834x1194) emulated in Chromium
+      name: 'iPad',
+      use: {
+        ...devices['iPad Pro 11'],
+        browserName: 'chromium',
+        defaultBrowserType: 'chromium',
+      },
+    },
   ],
 });
