@@ -42,7 +42,7 @@ export function useRoomChat(
 
     const q = query(
       collection(db, 'rooms', topicKey, 'subrooms', roomId, 'messages'),
-      orderBy('timestamp', 'asc'),
+      orderBy('timestamp', 'desc'),
       limit(100),
     );
 
@@ -50,7 +50,8 @@ export function useRoomChat(
     const prevCountRef = { current: 0 };
 
     const unsubscribe = onSnapshot(q, (snap) => {
-      const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RoomMessage));
+      // Query is desc (newest first) so we get latest 100; reverse for chronological display
+      const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as RoomMessage)).reverse();
       setMessages(msgs);
 
       if (!loadedRef.current) {
@@ -60,7 +61,7 @@ export function useRoomChat(
       }
       if (msgs.length > prevCountRef.current) {
         const newest = msgs[msgs.length - 1];
-        if (newest && newest.senderId !== uid) {
+        if (newest && newest.senderId !== uid && newest.type !== 'system') {
           showNotification(
             `${newest.senderAlias} in ${topicKey} Room 💬`,
             newest.type === 'gif' ? 'Sent a GIF 🖼️' : newest.text.slice(0, 80),

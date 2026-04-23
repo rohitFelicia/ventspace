@@ -161,7 +161,10 @@ export default function RoomChatScreen({ navigation, route }: Props) {
           data={messages}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.msgList}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          windowSize={999}
+          initialNumToRender={200}
+          maxToRenderPerBatch={200}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>

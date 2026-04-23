@@ -8,14 +8,12 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  where,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
-const MAX_ROOM_SIZE = 10;
-
 /**
- * Auto-join logic for group rooms.
+ * Auto-join logic for group rooms. No limit on room size — everyone joins the
+ * same single subroom per topic.
  *
  * Data model:
  *   rooms/{topicKey}/subrooms/{roomId}
@@ -23,7 +21,7 @@ const MAX_ROOM_SIZE = 10;
  *   rooms/{topicKey}/subrooms/{roomId}/messages/{msgId}
  *
  * Flow:
- *  1. Query subrooms for the topic with memberCount < MAX_ROOM_SIZE.
+ *  1. Query subrooms for the topic (limit 1).
  *  2. If one exists → transaction to increment memberCount + add uid to members.
  *  3. If none → create a new subroom with memberCount: 1.
  *  4. On leave → transaction to decrement + remove uid.
@@ -43,58 +41,55 @@ export function useRoomJoin() {
     try {
       const subroomsRef = collection(db, 'rooms', topicKey, 'subrooms');
 
-      // Find an available room (has space) — no orderBy to avoid composite index requirement
-      const availableQuery = query(
-        subroomsRef,
-        where('memberCount', '<', MAX_ROOM_SIZE),
-        limit(1),
-      );
-
-      const snap = await getDocs(availableQuery);
+      // Pick the first existing subroom — no where clause, no index needed
+      const snap = await getDocs(query(subroomsRef, limit(1)));
       let targetRoomId: string;
+      let targetRef: ReturnType<typeof doc>;
+      let isNew: boolean;
 
       if (!snap.empty) {
-        // Join existing room via transaction
-        const existingRef = snap.docs[0].ref;
-        targetRoomId = existingRef.id;
-
-        await runTransaction(db, async (tx) => {
-          const roomSnap = await tx.get(existingRef);
-          if (!roomSnap.exists()) throw new Error('Room disappeared');
-          const current = roomSnap.data().memberCount as number;
-          if (current >= MAX_ROOM_SIZE) throw new Error('Room full');
-          tx.update(existingRef, {
-            memberCount: current + 1,
-            [`members.${uid}`]: true,
-          });
-        });
+        targetRef = snap.docs[0].ref;
+        targetRoomId = targetRef.id;
+        isNew = false;
       } else {
-        // Create a new subroom
-        const newRoomRef = doc(subroomsRef);
-        targetRoomId = newRoomRef.id;
-
-        await runTransaction(db, async (tx) => {
-          tx.set(newRoomRef, {
-            topic: topicKey,
-            createdAt: serverTimestamp(),
-            memberCount: 1,
-            members: { [uid]: true },
-          });
-        });
+        targetRef = doc(subroomsRef);
+        targetRoomId = targetRef.id;
+        isNew = true;
       }
 
-      // Write system join message
-      try {
-        await addDoc(
-          collection(db, 'rooms', topicKey, 'subrooms', targetRoomId, 'messages'),
-          {
-            type: 'system',
-            text: `${alias ?? 'Someone'} joined the chat`,
-            senderId: 'system',
-            timestamp: serverTimestamp(),
-          },
-        );
-      } catch { /* non-blocking */ }
+      // Fire-and-forget the expensive writes — navigate immediately with roomId
+      const writeOp = isNew
+        ? runTransaction(db, async (tx) => {
+            tx.set(targetRef, {
+              topic: topicKey,
+              createdAt: serverTimestamp(),
+              memberCount: 1,
+              members: { [uid]: true },
+            });
+          })
+        : runTransaction(db, async (tx) => {
+            const roomSnap = await tx.get(targetRef);
+            if (!roomSnap.exists()) throw new Error('Room disappeared');
+            const current = (roomSnap.data().memberCount as number) ?? 0;
+            tx.update(targetRef, {
+              memberCount: current + 1,
+              [`members.${uid}`]: true,
+            });
+          });
+
+      writeOp
+        .then(() =>
+          addDoc(
+            collection(db, 'rooms', topicKey, 'subrooms', targetRoomId, 'messages'),
+            {
+              type: 'system',
+              text: `${alias ?? 'Someone'} joined the chat`,
+              senderId: uid,
+              timestamp: serverTimestamp(),
+            },
+          ).catch(() => {}),
+        )
+        .catch((err) => console.error('Background join error:', err));
 
       return { roomId: targetRoomId };
     } catch (err: any) {
@@ -115,7 +110,7 @@ export function useRoomJoin() {
           {
             type: 'system',
             text: `${alias ?? 'Someone'} left the chat`,
-            senderId: 'system',
+            senderId: uid,
             timestamp: serverTimestamp(),
           },
         );
