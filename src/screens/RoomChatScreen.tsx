@@ -134,7 +134,7 @@ export default function RoomChatScreen({ navigation, route }: Props) {
           <TouchableOpacity onPress={shareRoom} style={styles.shareBtn}>
             <Text style={styles.shareBtnText}>{copyToast ? '✓' : '🔗'}</Text>
           </TouchableOpacity>
-          <Text style={styles.myAlias}>{senderAlias}</Text>
+          <Text style={styles.myAlias} numberOfLines={1} ellipsizeMode="tail">{senderAlias}</Text>
         </View>
       </View>
 
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   leaveText: { fontSize: 15, fontWeight: '600' },
   headerCenter: { flex: 1, alignItems: 'center' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, maxWidth: 140 },
   breathBtn: {
     width: 32,
     height: 32,
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   },
   breathBtnText: { fontSize: 15 },
   headerTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
-  myAlias: { fontSize: 12, color: COLORS.textMuted },
+  myAlias: { fontSize: 12, color: COLORS.textMuted, maxWidth: 70 },
   vibeBadge: { fontSize: 18, marginTop: 2 },
   vibeSet: { fontSize: 11, fontWeight: '500', marginTop: 2 },
   vibePicker: {

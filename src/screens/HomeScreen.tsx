@@ -191,7 +191,11 @@ const styles = StyleSheet.create({
   },
   logoutBtn: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    minHeight: 36,
+    minWidth: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: RADIUS.full,
     backgroundColor: COLORS.card,
     borderWidth: 1,
@@ -200,7 +204,7 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 13,
     color: COLORS.textSecondary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   content: {
     flex: 1,
