@@ -16,10 +16,25 @@ service cloud.firestore {
         && request.auth.uid == userId;
     }
 
-    // ── Matchmaking queue ──────────────────────────────────────────────────────
-    // Any authenticated user can read/write the per-topic queue doc.
+    // ── Legacy matchmaking queue (single-slot) ────────────────────────────────
     match /matchmaking/{topic} {
       allow read, write: if request.auth != null;
+    }
+
+    // ── Similarity-based matchmaking queue ────────────────────────────────────
+    // Each user writes only their own slot; anyone authenticated can read slots
+    // to perform similarity scoring client-side.
+    match /matchmaking_queue/{topicKey}/slots/{slotUid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == slotUid;
+      allow delete: if request.auth != null;
+    }
+
+    // ── User keyword profiles (for matchmaking scoring) ───────────────────────
+    // Users can read all profiles for scoring; write only their own.
+    match /user_profiles/{profileUid}/topic_scores/{topicKey} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == profileUid;
     }
 
     // ── Pending session notifications ─────────────────────────────────────────
@@ -114,6 +129,26 @@ service cloud.firestore {
     match /rooms/{topicKey}/subrooms/{roomId}/typing/{typingUserId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == typingUserId;
+    }
+
+    // ── Username uniqueness registry ──────────────────────────────────────────
+    // Public read so unauthenticated users can check if a username exists
+    // before attempting account creation. Write requires auth and the document
+    // must reference the authenticated user.
+    match /usernames/{username} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+    }
+
+    // ── Presence tracking (for online user count) ─────────────────────────────
+    // Authenticated users can read all presence docs (to count online users)
+    // and write only their own.
+    match /presence/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

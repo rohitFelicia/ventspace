@@ -18,7 +18,10 @@ import MessageBubble from '../components/MessageBubble';
 import EmojiPicker from '../components/EmojiPicker';
 import GifPicker from '../components/GifPicker';
 import BreathingOverlay from '../components/BreathingOverlay';
+import LogoutButton from '../components/LogoutButton';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
+import { db } from '../firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
@@ -45,6 +48,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [showEmoji, setShowEmoji] = useState(false);
   const [showGif, setShowGif] = useState(false);
   const [showBreathing, setShowBreathing] = useState(false);
+  const [partnerAlias, setPartnerAlias] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const startTimeRef = useRef(Date.now());
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -57,6 +61,19 @@ export default function ChatScreen({ navigation, route }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load partner's alias
+  useEffect(() => {
+    if (!sessionId || !user?.uid) return;
+    getDoc(doc(db, 'sessions', sessionId)).then(async (snap) => {
+      if (!snap.exists()) return;
+      const participants: string[] = snap.data().participants ?? [];
+      const partnerUid = participants.find((p) => p !== user.uid);
+      if (!partnerUid) return;
+      const userSnap = await getDoc(doc(db, 'users', partnerUid));
+      if (userSnap.exists()) setPartnerAlias(userSnap.data().alias as string);
+    }).catch(() => {});
+  }, [sessionId, user?.uid]);
 
   // When partner leaves, delete messages on this side too (last one cleans up)
   useEffect(() => {
@@ -99,12 +116,26 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   const chatEnded = !sessionActive || partnerLeft;
 
+  // Auto-scroll to latest message
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const t = setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: false });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [messages.length]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: topicColor + '40' }]}>
         <View style={styles.headerLeft}>
           <View style={[styles.activeDot, { backgroundColor: chatEnded ? COLORS.textMuted : topicColor }]} />
-          <Text style={styles.headerTitle}>{topicLabel}</Text>
+          <View>
+            <Text style={styles.headerTitle}>{topicLabel}</Text>
+            {partnerAlias && (
+              <Text style={styles.headerSubtitle}>with {partnerAlias}</Text>
+            )}
+          </View>
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.breathBtn} onPress={() => setShowBreathing(true)}>
@@ -115,6 +146,7 @@ export default function ChatScreen({ navigation, route }: Props) {
               <Text style={styles.endButtonText}>End</Text>
             </TouchableOpacity>
           )}
+          <LogoutButton />
         </View>
       </View>
 
@@ -146,6 +178,7 @@ export default function ChatScreen({ navigation, route }: Props) {
           )}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
@@ -269,6 +302,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 1,
   },
   endButton: {
     paddingHorizontal: SPACING.md,

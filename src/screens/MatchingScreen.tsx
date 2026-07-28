@@ -11,6 +11,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useUser } from '../context/UserContext';
 import { useMatchmaking } from '../hooks/useMatchmaking';
+import LogoutButton from '../components/LogoutButton';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Matching'>;
@@ -49,6 +50,10 @@ export default function MatchingScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <View style={styles.topBar}>
+        <View />
+        <LogoutButton />
+      </View>
       <View style={styles.content}>
         <Text style={styles.emoji}>🔍</Text>
         <Text style={styles.title}>Finding someone for you…</Text>
@@ -76,6 +81,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
   },
   content: {
     flex: 1,

@@ -57,7 +57,6 @@ export default function MessageBubble({
         </View>
       )}
 
-      {/* Reaction tap row — always shown when onReact is provided */}
       {onReact && (
         <View style={[styles.reactRow, isSent ? styles.reactRowSent : styles.reactRowReceived]}>
           {REACTION_EMOJIS.map((emoji) => {
@@ -86,12 +85,14 @@ export default function MessageBubble({
 const styles = StyleSheet.create({
   row: {
     marginVertical: 3,
-  },
-  rowSent: {
+    flexDirection: 'row',
     alignItems: 'flex-end',
   },
+  rowSent: {
+    justifyContent: 'flex-end',
+  },
   rowReceived: {
-    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
   },
   bubble: {
     maxWidth: '75%',

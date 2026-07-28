@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { TOPICS } from '../constants/topics';
+import LogoutButton from '../components/LogoutButton';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TopicSelect'>;
@@ -17,9 +18,12 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TopicSelect'>;
 export default function TopicSelectScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+        <LogoutButton />
+      </View>
 
       <Text style={styles.title}>What's on your mind?</Text>
       <Text style={styles.subtitle}>
@@ -63,6 +67,11 @@ const styles = StyleSheet.create({
   back: {
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backText: {
     color: COLORS.primary,

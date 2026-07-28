@@ -5,6 +5,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   increment,
   onSnapshot,
@@ -15,6 +16,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { extractKeywords, mergeKeywords } from '../utils/keywords';
 
 export interface Message {
   id: string;
@@ -99,6 +101,32 @@ export function useChat(sessionId: string | null, uid: string | undefined) {
       senderId: uid,
       timestamp: serverTimestamp(),
     });
+
+    // Passively update the user's keyword profile for this 1-on-1 topic.
+    // The topicKey is stored on the session doc. Best-effort — never blocks UI.
+    (async () => {
+      try {
+        const sessionSnap = await getDoc(doc(db, 'sessions', sessionId));
+        const topicKey = sessionSnap.exists()
+          ? (sessionSnap.data().topic as string | undefined)
+          : undefined;
+        if (!topicKey) return;
+
+        const profileRef = doc(db, 'user_profiles', uid, 'topic_scores', topicKey);
+        const profileSnap = await getDoc(profileRef);
+        const existing: Record<string, number> = profileSnap.exists()
+          ? (profileSnap.data().keywords as Record<string, number>) ?? {}
+          : {};
+        const incoming = extractKeywords(text);
+        if (Object.keys(incoming).length === 0) return;
+        const updated = mergeKeywords(existing, incoming);
+        await setDoc(profileRef, {
+          keywords: updated,
+          updatedAt: serverTimestamp(),
+          messageCount: increment(1),
+        }, { merge: true });
+      } catch { /* best-effort */ }
+    })();
   };
 
   const sendGif = async (gifUrl: string, title: string) => {

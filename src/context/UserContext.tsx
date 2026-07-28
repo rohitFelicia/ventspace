@@ -13,8 +13,8 @@ interface UserContextType {
   user: User | null;
   alias: string | null;
   loading: boolean;
-  signUp: (phone: string, password: string, alias: string) => Promise<void>;
-  signIn: (phone: string, password: string) => Promise<void>;
+  /** Try to sign in; if username doesn't exist, create the account automatically. */
+  signInOrSignUp: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -22,17 +22,16 @@ const UserContext = createContext<UserContextType>({
   user: null,
   alias: null,
   loading: true,
-  signUp: async () => {},
-  signIn: async () => {},
+  signInOrSignUp: async () => {},
   logout: async () => {},
 });
 
-// We store users by phone using a synthetic email to leverage Firebase email/password auth.
-// The phone number is never exposed to other users — only the chosen alias is.
-const phoneToEmail = (phone: string) =>
-  `${phone.replace(/\D/g, '')}@ventspace.app`;
+// We store users by username using a synthetic email so Firebase email/password
+// auth works under the hood. The email is never shown to users.
+const usernameToEmail = (username: string) =>
+  `${username.toLowerCase().replace(/[^a-z0-9]/g, '_')}@ventspace.app`;
 
-// Cache alias locally so we don't hit Firestore on every app load
+// Cache alias locally so the UI is instant on reload
 const ALIAS_KEY = 'vs_alias';
 const getCachedAlias = () => {
   try { return localStorage.getItem(ALIAS_KEY); } catch { return null; }
@@ -46,7 +45,6 @@ const setCachedAlias = (a: string | null) => {
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  // Seed alias from cache immediately — avoids blank screen while Firestore responds
   const [alias, setAlias] = useState<string | null>(getCachedAlias);
   const [loading, setLoading] = useState(true);
 
@@ -54,8 +52,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // If we already have a cached alias, show the app immediately
-        // then refresh from Firestore in the background
         const cached = getCachedAlias();
         if (cached) {
           setAlias(cached);
@@ -69,7 +65,6 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           });
         } else {
-          // First ever load — must wait for Firestore
           const snap = await getDoc(doc(db, 'users', currentUser.uid));
           const fetched = snap.exists() ? (snap.data().alias as string) : null;
           setAlias(fetched);
@@ -85,33 +80,61 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return unsubscribe;
   }, []);
 
-  const signUp = async (phone: string, password: string, chosenAlias: string) => {
-    const email = phoneToEmail(phone);
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, 'users', cred.user.uid), {
-      alias: chosenAlias,
-      createdAt: serverTimestamp(),
-    });
-    setAlias(chosenAlias);
-    setCachedAlias(chosenAlias);
-  };
+  /**
+   * If the username exists → sign in.
+   * If the username doesn't exist → create a new account (auto sign-up).
+   * Username is unique: enforced via `usernames/{normalized}` in Firestore.
+   */
+  const signInOrSignUp = async (username: string, password: string) => {
+    const email = usernameToEmail(username);
+    const normalized = username.toLowerCase().trim();
 
-  const signIn = async (phone: string, password: string) => {
-    const email = phoneToEmail(phone);
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    const snap = await getDoc(doc(db, 'users', cred.user.uid));
-    const fetched = snap.exists() ? (snap.data().alias as string) : null;
-    setAlias(fetched);
-    setCachedAlias(fetched);
+    try {
+      // Happy path: try sign-in first
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDoc(doc(db, 'users', cred.user.uid));
+      const fetched = snap.exists() ? (snap.data().alias as string) : username;
+      setAlias(fetched);
+      setCachedAlias(fetched);
+    } catch (err: any) {
+      const isNewUser =
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/invalid-email'; // synthetic email not registered yet
+
+      if (!isNewUser) throw err; // wrong password or other error
+
+      // Username uniqueness check
+      const usernameSnap = await getDoc(doc(db, 'usernames', normalized));
+      if (usernameSnap.exists()) {
+        // Username is taken by someone else — wrong password
+        const e: any = new Error('Wrong password for this username.');
+        e.code = 'auth/wrong-password';
+        throw e;
+      }
+
+      // Create new account
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        username: normalized,
+        alias: username,
+        createdAt: serverTimestamp(),
+      });
+      // Reserve the username
+      await setDoc(doc(db, 'usernames', normalized), { uid: cred.user.uid });
+      setAlias(username);
+      setCachedAlias(username);
+    }
   };
 
   const logout = async () => {
     await signOut(auth);
     setAlias(null);
+    setCachedAlias(null);
   };
 
   return (
-    <UserContext.Provider value={{ user, alias, loading, signUp, signIn, logout }}>
+    <UserContext.Provider value={{ user, alias, loading, signInOrSignUp, logout }}>
       {children}
     </UserContext.Provider>
   );

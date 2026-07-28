@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getCountFromServer, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { useUser } from '../context/UserContext';
@@ -28,6 +28,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [notifStatus, setNotifStatus] = useState<string>(
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported',
   );
+  const [onlineCount, setOnlineCount] = useState<number>(0);
 
   const handleEnableNotifications = () => {
     if (typeof Notification === 'undefined') return;
@@ -35,6 +36,17 @@ export default function HomeScreen({ navigation }: Props) {
       setNotifStatus(result);
     }).catch(() => {});
   };
+
+  // Track presence and count online users
+  useEffect(() => {
+    if (!user) return;
+    // Write this user's presence (best-effort)
+    setDoc(doc(db, 'presence', user.uid), { lastSeen: serverTimestamp() }, { merge: true }).catch(() => {});
+    // Count users active in the last 5 minutes
+    const fiveMinutesAgo = Timestamp.fromMillis(Date.now() - 5 * 60 * 1000);
+    const q = query(collection(db, 'presence'), where('lastSeen', '>', fiveMinutesAgo));
+    getCountFromServer(q).then((snap) => setOnlineCount(snap.data().count)).catch(() => {});
+  }, [user]);
 
   // Handle shared room deep links: ?room=<topicKey>&subroom=<roomId>
   useEffect(() => {
@@ -106,19 +118,21 @@ export default function HomeScreen({ navigation }: Props) {
         )}
 
         <View style={styles.buttons}>
-          <TouchableOpacity
-            style={[styles.button, styles.buttonPrimary]}
-            onPress={() => navigation.navigate('TopicSelect')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.buttonIcon}>🤝</Text>
-            <View style={styles.buttonTextWrap}>
-              <Text style={styles.buttonPrimaryTitle}>Talk 1-on-1</Text>
-              <Text style={styles.buttonPrimarySubtitle}>
-                Match with someone going through the same thing
-              </Text>
-            </View>
-          </TouchableOpacity>
+          {onlineCount >= 10 && (
+            <TouchableOpacity
+              style={[styles.button, styles.buttonPrimary]}
+              onPress={() => navigation.navigate('TopicSelect')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.buttonIcon}>🤝</Text>
+              <View style={styles.buttonTextWrap}>
+                <Text style={styles.buttonPrimaryTitle}>Talk 1-on-1</Text>
+                <Text style={styles.buttonPrimarySubtitle}>
+                  Match with someone going through the same thing
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[styles.button, styles.buttonSecondary]}
@@ -280,6 +294,20 @@ const styles = StyleSheet.create({
   buttonSecondarySubtitle: {
     fontSize: 13,
     color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  buttonDisabled: {
+    backgroundColor: COLORS.border,
+    opacity: 0.7,
+  },
+  buttonDisabledTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+  },
+  buttonDisabledSubtitle: {
+    fontSize: 13,
+    color: COLORS.textMuted,
     marginTop: 2,
   },
   disclaimer: {

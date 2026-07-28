@@ -28,6 +28,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { TOPICS } from '../constants/topics';
 import { useUser } from '../context/UserContext';
 import { useRoomJoin } from '../hooks/useRoomJoin';
+import LogoutButton from '../components/LogoutButton';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 export interface FirestoreTopic {
@@ -287,9 +288,12 @@ export default function RoomsListScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
-        <Text style={styles.backText}>← Back</Text>
-      </TouchableOpacity>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.back} onPress={() => navigation.goBack()}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+        <LogoutButton />
+      </View>
 
       <View style={styles.titleRow}>
         <View style={{ flex: 1 }}>
@@ -338,6 +342,11 @@ const styles = StyleSheet.create({
   back: {
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backText: {
     color: COLORS.primary,

@@ -20,6 +20,7 @@ import { useRoomJoin } from '../hooks/useRoomJoin';
 import EmojiPicker from '../components/EmojiPicker';
 import GifPicker from '../components/GifPicker';
 import BreathingOverlay from '../components/BreathingOverlay';
+import LogoutButton from '../components/LogoutButton';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 const VIBES = [
@@ -43,6 +44,7 @@ export default function RoomChatScreen({ navigation, route }: Props) {
   const [vibe, setVibeState] = useState<string | null>(null);
   const [showVibePicker, setShowVibePicker] = useState(false);
   const [copyToast, setCopyToast] = useState(false);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
   const [showBreathing, setShowBreathing] = useState(false);
   const flatListRef = useRef<FlatList<RoomMessage>>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -74,7 +76,12 @@ export default function RoomChatScreen({ navigation, route }: Props) {
     if (!roomId) return;
     const unsubVibe = onSnapshot(
       doc(db, 'rooms', topicKey, 'subrooms', roomId),
-      (snap) => { if (snap.exists()) setVibeState(snap.data().vibe ?? null); },
+      (snap) => {
+        if (snap.exists()) {
+          setVibeState(snap.data().vibe ?? null);
+          setMemberCount(snap.data().memberCount ?? null);
+        }
+      },
     );
     return unsubVibe;
   }, [topicKey, roomId]);
@@ -108,6 +115,15 @@ export default function RoomChatScreen({ navigation, route }: Props) {
     typingTimerRef.current = setTimeout(() => setTyping(false), 2000);
   };
 
+  // Auto-scroll to latest message whenever messages change
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const t = setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: false });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [messages.length]);
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: topicColor + '40' }]}>
@@ -116,6 +132,9 @@ export default function RoomChatScreen({ navigation, route }: Props) {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>{topicLabel} Room</Text>
+          {memberCount !== null && (
+            <Text style={styles.headerSubtitle}>{memberCount} {memberCount === 1 ? 'member' : 'members'}</Text>
+          )}
           {vibe && (
             <TouchableOpacity onPress={() => setShowVibePicker(v => !v)}>
               <Text style={styles.vibeBadge}>{vibe}</Text>
@@ -135,6 +154,7 @@ export default function RoomChatScreen({ navigation, route }: Props) {
             <Text style={styles.shareBtnText}>{copyToast ? '✓' : '🔗'}</Text>
           </TouchableOpacity>
           <Text style={styles.myAlias} numberOfLines={1} ellipsizeMode="tail">{senderAlias}</Text>
+          <LogoutButton />
         </View>
       </View>
 
@@ -165,6 +185,7 @@ export default function RoomChatScreen({ navigation, route }: Props) {
           maxToRenderPerBatch={10}
           windowSize={10}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>
@@ -314,6 +335,7 @@ const styles = StyleSheet.create({
   },
   breathBtnText: { fontSize: 15 },
   headerTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  headerSubtitle: { fontSize: 12, color: COLORS.textMuted, marginTop: 1, textAlign: 'center' },
   myAlias: { fontSize: 12, color: COLORS.textMuted, maxWidth: 70 },
   vibeBadge: { fontSize: 18, marginTop: 2 },
   vibeSet: { fontSize: 11, fontWeight: '500', marginTop: 2 },

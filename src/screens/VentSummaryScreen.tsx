@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import LogoutButton from '../components/LogoutButton';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VentSummary'>;
@@ -19,6 +20,10 @@ export default function VentSummaryScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.topBar}>
+        <View />
+        <LogoutButton />
+      </View>
       <View style={styles.card}>
         <Text style={styles.heart}>💙</Text>
         <Text style={styles.title}>Session ended</Text>
@@ -70,6 +75,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     justifyContent: 'center',
     padding: SPACING.lg,
+  },
+  topBar: {
+    position: 'absolute',
+    top: SPACING.md,
+    right: SPACING.lg,
+    left: SPACING.lg,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   card: {
     backgroundColor: COLORS.card,

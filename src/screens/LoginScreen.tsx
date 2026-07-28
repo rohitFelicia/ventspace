@@ -15,25 +15,30 @@ import { useUser } from '../context/UserContext';
 import { COLORS, SPACING, RADIUS } from '../constants/theme';
 
 export default function LoginScreen() {
-  const { signUp, signIn } = useUser();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [phone, setPhone] = useState('');
+  const { signInOrSignUp } = useUser();
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [alias, setAlias] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
     setError('');
-    const trimmedPhone = phone.trim();
-    const trimmedAlias = alias.trim();
+    const trimmedUsername = username.trim();
 
-    if (!trimmedPhone || !password) {
-      setError('Please enter your phone number and password.');
+    if (!trimmedUsername) {
+      setError('Please enter a username.');
       return;
     }
-    if (mode === 'register' && !trimmedAlias) {
-      setError('Please choose an anonymous name.');
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
+      setError('Username can only contain letters, numbers and underscores.');
+      return;
+    }
+    if (trimmedUsername.length < 3) {
+      setError('Username must be at least 3 characters.');
+      return;
+    }
+    if (!password) {
+      setError('Please enter a password.');
       return;
     }
     if (password.length < 6) {
@@ -43,20 +48,13 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      if (mode === 'register') {
-        await signUp(trimmedPhone, password, trimmedAlias);
-      } else {
-        await signIn(trimmedPhone, password);
-      }
+      await signInOrSignUp(trimmedUsername, password);
     } catch (err: any) {
-      console.error('Auth error:', err.code, err.message);
       const msg =
-        err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential'
-          ? 'Wrong phone number or password.'
-          : err.code === 'auth/email-already-in-use'
-          ? 'This phone number is already registered. Try logging in instead.'
-          : err.code === 'auth/operation-not-allowed'
-          ? 'Email/Password sign-in is not enabled yet. Check Firebase console.'
+        err.code === 'auth/wrong-password'
+          ? 'Wrong password for this username.'
+          : err.code === 'auth/too-many-requests'
+          ? 'Too many attempts. Please try again later.'
           : err.message ?? 'Something went wrong.';
       setError(msg);
     } finally {
@@ -78,40 +76,22 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.card}>
-            {/* Tab toggle */}
-            <View style={styles.tabs}>
-              <TouchableOpacity
-                style={[styles.tab, mode === 'login' && styles.tabActive]}
-                onPress={() => setMode('login')}
-              >
-                <Text style={[styles.tabText, mode === 'login' && styles.tabTextActive]}>
-                  Log In
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tab, mode === 'register' && styles.tabActive]}
-                onPress={() => setMode('register')}
-              >
-                <Text style={[styles.tabText, mode === 'register' && styles.tabTextActive]}>
-                  Sign Up
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Phone */}
-            <Text style={styles.label}>Phone Number</Text>
+            <Text style={styles.label}>Username</Text>
             <TextInput
               style={styles.input}
-              placeholder="+1 555 000 0000"
+              placeholder="e.g. QuietFox or BlueMoon42"
               placeholderTextColor={COLORS.textMuted}
-              keyboardType="phone-pad"
-              value={phone}
-              onChangeText={setPhone}
+              value={username}
+              onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
+              maxLength={24}
             />
+            <Text style={styles.hint}>
+              Your username is your anonymous name — others only see this.
+              New username? We'll create your account automatically.
+            </Text>
 
-            {/* Password */}
             <Text style={styles.label}>Password</Text>
             <TextInput
               style={styles.input}
@@ -121,25 +101,6 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
             />
-
-            {/* Alias — only on register */}
-            {mode === 'register' && (
-              <>
-                <Text style={styles.label}>Your Anonymous Name</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. QuietFox, BlueMoon42"
-                  placeholderTextColor={COLORS.textMuted}
-                  value={alias}
-                  onChangeText={setAlias}
-                  maxLength={24}
-                  autoCapitalize="words"
-                />
-                <Text style={styles.hint}>
-                  This is the only name other users will ever see — not your phone number.
-                </Text>
-              </>
-            )}
 
             {!!error && (
               <View style={styles.errorBox}>
@@ -155,14 +116,12 @@ export default function LoginScreen() {
               {loading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>
-                  {mode === 'register' ? '🚀  Create my account' : '🔐  Log In'}
-                </Text>
+                <Text style={styles.buttonText}>Continue →</Text>
               )}
             </TouchableOpacity>
 
             <Text style={styles.disclaimer}>
-              Your phone number is never shown to anyone. Only your chosen name is visible.
+              No email or phone needed · All chats are anonymous · Be kind 💙
             </Text>
           </View>
         </ScrollView>
@@ -188,22 +147,6 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 4,
   },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.border,
-    borderRadius: RADIUS.md,
-    marginBottom: SPACING.lg,
-    padding: 4,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-  },
-  tabActive: { backgroundColor: COLORS.card, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  tabText: { fontSize: 15, fontWeight: '600', color: COLORS.textMuted },
-  tabTextActive: { color: COLORS.primary },
   label: { fontSize: 13, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 6, marginTop: SPACING.sm },
   input: {
     borderWidth: 1.5,
@@ -245,3 +188,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 });
+
